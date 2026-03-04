@@ -1,0 +1,14 @@
+# 1. 파이썬 설치
+FROM python:3.10-slim
+
+# 2. 작업 공간 만들기
+WORKDIR /app
+
+# 3. 내 컴퓨터 파일들을 서버로 복사
+COPY . .
+
+# 4. 필요한 도구(requirements.txt) 설치
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 5. 서버 실행 (포트 10000번 사용)
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
