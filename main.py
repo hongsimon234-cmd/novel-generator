@@ -1,48 +1,31 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import openai
 import os
-from dotenv import load_dotenv
+from flask import Flask, request, jsonify
+import google.generativeai as genai
 
-# 설정 로드
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
+app = Flask(__name__)
 
-app = FastAPI(title="전문 진단 결과 생성기")
+# [수정됨] Render 금고(환경 변수)에서 키를 가져오도록 설정
+api_key = os.environ.get("GEMINI_API_KEY")
+genai.configure(api_key=api_key)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-# 입력받을 데이터 형식
-class DiagnosisRequest(BaseModel):
-    symptoms: str  # 환자 증상
-    history: str   # 과거 병력 또는 참고사항
-
-@app.get("/")
-def health_check():
-    return {"status": "전문 진단 서버가 가동 중입니다."}
-
-@app.post("/generate-diagnosis")
-async def generate_diagnosis(request: DiagnosisRequest):
+@app.route('/generate-story', methods=['POST'])
+def generate_story():
+    data = request.json
+    subject = data.get('subject', '')
+    
+    prompt = f"당신은 노벨 문학상 후보에 오를 법한 모든 분야에 통달한 천재 현대 소설가입니다. 다음 주제를 바탕으로 깊이 있는 은유와 세밀한 심리 묘사가 담긴 단편 소설을 작성하세요. 주제: {subject} 에 대해 문학적인 소설을 한 문단 작성하세요. [작성 규칙]
+    1. 독자의 상상력을 자극하는 문학적인 문체를 사용할 것.
+    2. 사건 중심이 아닌, 인물의 내면과 분위기 묘사에 집중할 것.
+    3. 결말은 여운이 남도록 구성할 것.
+    4. 한국어의 아름다움을 살린 고급 어휘를 선택할 것."
+    
     try:
-        # AI에게 줄 지시문 (프롬프트)
-        prompt = f"""
-        당신은 20년 경력의 전문의입니다. 
-        아래 환자의 증상과 병력을 바탕으로 전문적인 진단 결과 초안을 작성하세요.
-        
-        [환자 증상]: {request.symptoms}
-        [과거 병력]: {request.history}
-        
-        결과에는 다음 내용을 포함하세요:
-        1. 추정 가능한 질환 명칭
-        2. 증상에 대한 의학적 분석
-        3. 권장하는 추가 검사 또는 생활 수칙
-        4. 주의사항 (본 결과는 참고용이며 반드시 대면 진료가 필요함을 명시)
-        """
-
-        response = openai.chat.completions.create(
-            model="gpt-4o",  # 또는 gpt-3.5-turbo
-            messages=[{"role": "system", "content": "당신은 유능하고 친절한 전문의입니다."},
-                      {"role": "user", "content": prompt}]
-        )
-        
-        return {"diagnosis": response.choices[0].message.content}
+        response = model.generate_content(prompt)
+        return jsonify({"story": response.text})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    # Render는 10000번 포트를 사용합니다.
+    app.run(host='0.0.0.0', port=10000)
